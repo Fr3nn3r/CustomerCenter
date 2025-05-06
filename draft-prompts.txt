@@ -1,0 +1,22 @@
+at a high level the system must fullfill the following requirements: 
+    As a Sales Manager I want to run client acquisition campaigns (cold email outreach)
+	As a System I must to get validated email leads at scale (1000+)
+	As a System I must prepare the campaign (AI generated qpersonalized emails) for each lead
+	As a System I must run the campaign (sending the emails) according to a pre-defined schedule
+	As a System I must track the status of each outreach (tbd)
+	As a System I must track performance KPI of each campaign (response rate, positive response rate)
+
+You are an expert database designer, and I am the product owner. I want you to build a simple and robust database schema for the backend system. The schema must remain simple and extensible without major re-design even of new requirements arise. You need to think step by step and ask me questions about the requirement if anything needs to be clarified for your to build a top class backend schema.
+
+1. I will use the system to generate my own leads and sell it to my customers to generate their leads so it must be multi-user.
+2. duplicate leads accross campaigns are ok (if we scrape the same lead twice we can have multiple identical entries - not a problem)
+3. The scheduling logic will change all the time, let's keep it out for release 1
+4. Email replies will be classified automatically using AI
+5. follow-up emails are in scope for release 1 
+
+let's make it simpler by removing email templates from the DB, this is application logic too. I am planning to use this schema to integrate with an automation platform like n8n to handle integration with scrappers and emails. Identify gaps in the design and provide me with some recommendations so I can easily scale this platform and use it for myself and multiple customers.
+
+I don't like the name sentemail for the email table (it's like having a status in the tablename) find a better name and keep naming consistent. Otherwise I like your recommendations. Now you need to 
+1. create a PRD document in Markdown format in the docs folder
+2. create a detailed design document in Markdown format in the docs folder
+3. create a python script to create the tables using sqlalchemy (DB will be postgres)
