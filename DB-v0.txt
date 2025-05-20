@@ -1,0 +1,59 @@
+Campaign
+-
+campaign_id uuid PK
+name string
+description text NULL
+status string INDEX
+created_at timestamp
+updated_at timestamp
+
+Organization
+-
+organization_id uuid PK
+external_id string NULL
+external_source string NULL
+name string
+website_url string NULL
+linkedin_url string NULL
+country string NULL
+raw_address string NULL
+street string NULL
+city string NULL
+state string NULL
+postal_code string NULL
+facebook_url string NULL
+language string NULL
+time_zone string NULL
+primary_domain string NULL
+email_domain string NULL
+estimated_num_employees int NULL
+website_summary_data jsonb NULL
+website_raw_data jsonb NULL
+formatted_organization_name string NULL
+source string NULL
+created_at timestamp
+updated_at timestamp
+
+Lead
+-
+lead_id uuid PK
+campaign_id uuid FK >- Campaign.campaign_id
+company_id uuid FK >- Organization.organization_id
+first_name string NULL
+last_name string NULL
+email string INDEX
+external_id string NULL
+title string NULL
+headline string NULL
+linkedin_url string NULL
+email_verification_status string NULL
+email_verification_message string NULL
+email_icebreaker string NULL
+status string INDEX
+language string NULL
+source string NULL
+email_sent_at timestamp NULL
+reply_received_at timestamp NULL
+last_contacted_at timestamp NULL
+created_at timestamp
+updated_at timestamp

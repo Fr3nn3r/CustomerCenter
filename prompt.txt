@@ -1,0 +1,2 @@
+I want you read the context of the project and generate a txt file containing the DB model following the format in example in dbmodel.txt
+generate a customercenterdb.txt with the current DB schema.
