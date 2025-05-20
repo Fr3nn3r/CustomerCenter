@@ -1,11 +1,18 @@
 import os
-
-# Configure database to use local SQLite file for testing before importing DB module
-os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
-
-from outreach.database import SessionLocal, engine
-from outreach import crud, models
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+# Use PostgreSQL for testing
+TEST_DATABASE_URL = (
+    "postgresql+psycopg2://owluser:owlsrock@localhost:5432/owlai_test_db"
+)
+
+# Create test engine
+engine = create_engine(TEST_DATABASE_URL)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+from outreach import crud, models
 
 
 @pytest.fixture(scope="function")
@@ -13,9 +20,13 @@ def session():
     # Start each test with a clean database
     models.Base.metadata.drop_all(bind=engine)
     models.Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    yield db
-    db.close()
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+        # Clean up after test
+        models.Base.metadata.drop_all(bind=engine)
 
 
 def test_create_and_get_campaign(session):

@@ -4,160 +4,154 @@
 
 This document provides a detailed design of the backend system for the Customer Center, focusing on the database schema. It builds upon the requirements outlined in the [Product Requirements Document (PRD)](./prd.md).
 
-The backend will utilize a PostgreSQL database, with the schema managed and interacted with via SQLAlchemy in the application layer.
+The backend utilizes a PostgreSQL database with SQLAlchemy ORM for schema management and data access. The system is designed with a focus on scalability, maintainability, and integration with automation platforms like n8n.
 
 ## 2. Database Schema
 
-The database is designed with a multi-tenant architecture from the ground up. A `tenant_id` column in most tables ensures data isolation. PostgreSQL's features like `JSONB` will be used for flexible data storage.
+The database is implemented using PostgreSQL with the following key features:
+- UUID primary keys for distributed-friendly identifiers
+- JSONB for flexible data storage
+- Timestamps with timezone support
+- Strategic indexing for performance
+- SQLAlchemy ORM for type-safe database access
 
 ### 2.1. Table Overview
 
-1.  **`tenants`**: Stores information about each client/customer account using the platform.
-2.  **`users`**: Stores user accounts, linked to a tenant.
-3.  **`campaigns`**: Stores details of outreach campaigns, linked to a tenant and a user.
-4.  **`leads`**: Stores lead information, linked to a tenant and a campaign.
-5.  **`outbound_emails`**: Tracks each individual email scheduled or sent as part of a campaign.
-6.  **`email_replies`**: Stores incoming replies to sent emails and their AI classification.
+1. **`campaigns`**: Core table for managing outreach campaigns
+2. **`organizations`**: Stores company information for leads
+3. **`leads`**: Stores lead information and campaign associations
 
 ### 2.2. Table Definitions
 
-#### 2.2.1. `tenants` Table
+#### 2.2.1. `campaigns` Table
 
-*   **Purpose**: Manages different customers/accounts (tenants) using the platform.
-*   **Columns**:
-    *   `tenant_id` (UUID, Primary Key, DEFAULT gen_random_uuid()) - Unique identifier for the tenant.
-    *   `name` (VARCHAR(255), NOT NULL) - Name of the tenant/customer company.
-    *   `api_key_hash` (VARCHAR(255), UNIQUE, NULLABLE) - Hashed API key for programmatic tenant access.
-    *   `plan_details` (JSONB, NULLABLE) - Tenant-specific subscription plan info or feature flags.
-    *   `created_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP) - Timestamp of tenant creation.
-    *   `updated_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP) - Timestamp of last update.
-*   **Indexes**:
-    *   `idx_tenants_api_key_hash` ON `api_key_hash` WHERE `api_key_hash` IS NOT NULL.
+* **Purpose**: Manages outreach campaigns
+* **Columns**:
+    * `campaign_id` (UUID, Primary Key) - Unique identifier
+    * `name` (String, NOT NULL) - Campaign name
+    * `description` (Text, NULLABLE) - Campaign description
+    * `status` (String, NOT NULL) - Campaign status
+    * `created_at` (DateTime with timezone) - Creation timestamp
+    * `updated_at` (DateTime with timezone) - Last update timestamp
+* **Relationships**:
+    * One-to-many with `leads` table
+* **Indexes**:
+    * `idx_outreach_campaign_status` on `status`
 
-#### 2.2.2. `users` Table
+#### 2.2.2. `organizations` Table
 
-*   **Purpose**: Stores information about users, associated with a specific tenant.
-*   **Columns**:
-    *   `user_id` (UUID, Primary Key, DEFAULT gen_random_uuid()) - Unique identifier for the user.
-    *   `tenant_id` (UUID, Foreign Key references `tenants(tenant_id)`, NOT NULL) - Links user to their tenant.
-    *   `username` (VARCHAR(100), NOT NULL) - User's login name.
-    *   `email` (VARCHAR(255), NOT NULL) - User's email address.
-    *   `password_hash` (VARCHAR(255), NOT NULL) - Hashed password for security.
-    *   `full_name` (VARCHAR(255), NULLABLE) - Full name of the user.
-    *   `role` (VARCHAR(50), NOT NULL, DEFAULT 'member') - Role within their tenant (e.g., 'admin', 'manager', 'member').
-    *   `is_active` (BOOLEAN, NOT NULL, DEFAULT TRUE).
-    *   `created_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP).
-    *   `updated_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP).
-*   **Constraints**:
-    *   `uq_users_tenant_username` UNIQUE (`tenant_id`, `username`).
-    *   `uq_users_tenant_email` UNIQUE (`tenant_id`, `email`).
-*   **Indexes**:
-    *   `idx_users_tenant_id` ON `tenant_id`.
-    *   `idx_users_email` ON `email`.
+* **Purpose**: Stores company information
+* **Columns**:
+    * `organization_id` (UUID, Primary Key) - Unique identifier
+    * `name` (String, NOT NULL) - Company name
+    * `email_domain` (String, NOT NULL) - Company email domain
+    * `external_id` (String, NULLABLE) - External system ID
+    * `external_source` (String, NULLABLE) - Source system
+    * `website_url` (String, NULLABLE) - Company website
+    * `linkedin_url` (String, NULLABLE) - LinkedIn profile
+    * `estimated_num_employees` (Integer, NULLABLE) - Company size
+    * `website_summary_data` (JSONB, NULLABLE) - Processed website data
+    * `website_raw_data` (JSONB, NULLABLE) - Raw website data
+    * `country` (String, NULLABLE) - Company location
+    * `language` (String, NULLABLE) - Primary language
+    * `time_zone` (String, NULLABLE) - Company timezone
+    * `source` (String, NULLABLE) - Data source
+    * `formatted_organization_name` (String, NULLABLE) - Normalized name
+    * `raw_address` (String, NULLABLE) - Company address
+    * `created_at` (DateTime with timezone) - Creation timestamp
+    * `updated_at` (DateTime with timezone) - Last update timestamp
+* **Relationships**:
+    * One-to-many with `leads` table
+* **Indexes**:
+    * `idx_outreach_organization_email_domain` on `email_domain`
 
-#### 2.2.3. `campaigns` Table
+#### 2.2.3. `leads` Table
 
-*   **Purpose**: Stores details about each client acquisition campaign, linked to a tenant.
-*   **Columns**:
-    *   `campaign_id` (UUID, Primary Key, DEFAULT gen_random_uuid()) - Unique identifier for the campaign.
-    *   `tenant_id` (UUID, Foreign Key references `tenants(tenant_id)`, NOT NULL) - Links campaign to a tenant.
-    *   `user_id` (UUID, Foreign Key references `users(user_id)`, NOT NULL) - The user who created/manages it.
-    *   `name` (VARCHAR(255), NOT NULL) - Name of the campaign.
-    *   `description` (TEXT, NULLABLE) - Detailed description of the campaign.
-    *   `status` (VARCHAR(50), NOT NULL, DEFAULT 'draft') - E.g., 'draft', 'active', 'paused', 'completed', 'archived'.
-    *   `settings` (JSONB, NULLABLE) - Campaign-specific configurations (e.g., AI parameters, sending schedules).
-    *   `created_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP).
-    *   `updated_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP).
-*   **Indexes**:
-    *   `idx_campaigns_tenant_id` ON `tenant_id`.
-    *   `idx_campaigns_user_id` ON `user_id`.
-    *   `idx_campaigns_status` ON `status`.
-
-#### 2.2.4. `leads` Table
-
-*   **Purpose**: Stores information about each email lead, linked to a tenant and campaign.
-*   **Columns**:
-    *   `lead_id` (UUID, Primary Key, DEFAULT gen_random_uuid()) - Unique identifier for this lead entry.
-    *   `tenant_id` (UUID, Foreign Key references `tenants(tenant_id)`, NOT NULL) - Links lead to a tenant.
-    *   `campaign_id` (UUID, Foreign Key references `campaigns(campaign_id)`, NOT NULL) - Associates lead with a specific campaign.
-    *   `email_address` (VARCHAR(255), NOT NULL) - The lead's email address.
-    *   `first_name` (VARCHAR(100), NULLABLE).
-    *   `last_name` (VARCHAR(100), NULLABLE).
-    *   `company_name` (VARCHAR(255), NULLABLE).
-    *   `title` (VARCHAR(100), NULLABLE) - Job title.
-    *   `custom_fields` (JSONB, NULLABLE) - Additional structured data for personalization.
-    *   `source_description` (VARCHAR(255), NULLABLE) - How this lead was obtained.
-    *   `lead_batch_id` (VARCHAR(100), NULLABLE) - Identifier for a batch import.
-    *   `is_validated` (BOOLEAN, NOT NULL, DEFAULT FALSE) - If the email has been validated.
-    *   `created_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP).
-    *   `updated_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP).
-*   **Indexes**:
-    *   `idx_leads_tenant_id_campaign_id` ON (`tenant_id`, `campaign_id`).
-    *   `idx_leads_email_address` ON `email_address`.
-    *   `idx_leads_is_validated` ON `is_validated`.
-
-#### 2.2.5. `outbound_emails` Table
-
-*   **Purpose**: Tracks each individual email scheduled, sent, or interacted with. Replaces `SentEmails`.
-*   **Columns**:
-    *   `outbound_email_id` (UUID, Primary Key, DEFAULT gen_random_uuid()) - Unique ID for the email.
-    *   `tenant_id` (UUID, Foreign Key references `tenants(tenant_id)`, NOT NULL).
-    *   `campaign_id` (UUID, Foreign Key references `campaigns(campaign_id)`, NOT NULL).
-    *   `lead_id` (UUID, Foreign Key references `leads(lead_id)`, NOT NULL).
-    *   `parent_outbound_email_id` (UUID, Foreign Key references `outbound_emails(outbound_email_id)`, NULLABLE) - For follow-up sequences.
-    *   `subject_actual` (TEXT, NOT NULL) - Final, personalized subject line.
-    *   `body_actual` (TEXT, NOT NULL) - Final, AI-personalized email body.
-    *   `status` (VARCHAR(50), NOT NULL, DEFAULT 'scheduled') - E.g., 'scheduled', 'pending_personalization', 'pending_send', 'sent', 'delivered', 'bounced', 'failed', 'opened', 'clicked'.
-    *   `scheduled_send_time` (TIMESTAMP WITH TIME ZONE, NULLABLE) - When the email is/was scheduled.
-    *   `actual_send_time` (TIMESTAMP WITH TIME ZONE, NULLABLE) - When the email was dispatched.
-    *   `opened_at` (TIMESTAMP WITH TIME ZONE, NULLABLE) - Timestamp of first open.
-    *   `clicked_at` (TIMESTAMP WITH TIME ZONE, NULLABLE) - Timestamp of first click.
-    *   `error_message` (TEXT, NULLABLE) - If sending/delivery failed.
-    *   `created_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP).
-    *   `updated_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP).
-*   **Indexes**:
-    *   `idx_outbound_emails_tenant_id_campaign_id` ON (`tenant_id`, `campaign_id`).
-    *   `idx_outbound_emails_lead_id` ON `lead_id`.
-    *   `idx_outbound_emails_status_scheduled_time` ON (`status`, `scheduled_send_time`) WHERE `status` IN ('scheduled', 'pending_send').
-    *   `idx_outbound_emails_parent_id` ON `parent_outbound_email_id`.
-
-#### 2.2.6. `email_replies` Table
-
-*   **Purpose**: Stores incoming replies to sent emails and their AI classification.
-*   **Columns**:
-    *   `reply_id` (UUID, Primary Key, DEFAULT gen_random_uuid()) - Unique identifier for the reply.
-    *   `tenant_id` (UUID, Foreign Key references `tenants(tenant_id)`, NOT NULL).
-    *   `outbound_email_id` (UUID, Foreign Key references `outbound_emails(outbound_email_id)`, NOT NULL) - The original sent email.
-    *   `lead_id` (UUID, Foreign Key references `leads(lead_id)`, NOT NULL) - The lead who replied.
-    *   `reply_received_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP) - When the reply was received.
-    *   `reply_subject` (TEXT, NULLABLE).
-    *   `reply_body` (TEXT, NULLABLE).
-    *   `ai_classification` (VARCHAR(100), NULLABLE) - E.g., 'positive_response', 'objection', 'unsubscribe'.
-    *   `classification_confidence` (FLOAT, NULLABLE) - Confidence score from AI.
-    *   `classified_at` (TIMESTAMP WITH TIME ZONE, NULLABLE) - When AI classification was performed.
-    *   `created_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP).
-    *   `updated_at` (TIMESTAMP WITH TIME ZONE, NOT NULL, DEFAULT CURRENT_TIMESTAMP).
-*   **Indexes**:
-    *   `idx_email_replies_tenant_id_outbound_email_id` ON (`tenant_id`, `outbound_email_id`).
-    *   `idx_email_replies_lead_id` ON `lead_id`.
+* **Purpose**: Stores lead information and campaign associations
+* **Columns**:
+    * `lead_id` (UUID, Primary Key) - Unique identifier
+    * `campaign_id` (UUID, Foreign Key) - Associated campaign
+    * `company_id` (UUID, Foreign Key) - Associated organization
+    * `first_name` (String, NULLABLE) - Lead's first name
+    * `last_name` (String, NULLABLE) - Lead's last name
+    * `email` (String, NOT NULL) - Lead's email address
+    * `external_id` (String, NULLABLE) - External system ID
+    * `title` (String, NULLABLE) - Job title
+    * `headline` (String, NULLABLE) - Professional headline
+    * `linkedin_url` (String, NULLABLE) - LinkedIn profile
+    * `email_verification_status` (String, NULLABLE) - Email validation status
+    * `email_verification_message` (String, NULLABLE) - Validation details
+    * `email_icebreaker` (String, NULLABLE) - AI-generated icebreaker
+    * `status` (String, NOT NULL) - Lead status
+    * `language` (String, NULLABLE) - Preferred language
+    * `source` (String, NULLABLE) - Lead source
+    * `email_sent_at` (DateTime with timezone, NULLABLE) - Last email sent
+    * `reply_received_at` (DateTime with timezone, NULLABLE) - Last reply received
+    * `last_contacted_at` (DateTime with timezone, NULLABLE) - Last contact
+    * `created_at` (DateTime with timezone) - Creation timestamp
+    * `updated_at` (DateTime with timezone) - Last update timestamp
+* **Relationships**:
+    * Many-to-one with `campaigns` table
+    * Many-to-one with `organizations` table
+* **Indexes**:
+    * `ix_leads_email` on `email`
+    * `idx_outreach_lead_status` on `status`
 
 ## 3. Data Model Considerations
 
-*   **Multi-Tenancy**: Implemented via a `tenant_id` discriminator column in all relevant tables. Application logic MUST enforce filtering by `tenant_id` for all queries to ensure data isolation.
-*   **UUIDs as Primary Keys**: Using UUIDs (`gen_random_uuid()` in PostgreSQL) helps in distributed environments and prevents ID clashes if data from different sources/tenants were ever to be merged outside the strict tenancy model (though not planned).
-*   **Timestamps**: All timestamps are stored `WITH TIME ZONE` to ensure consistency across different server/user timezones. `CURRENT_TIMESTAMP` is used for defaults.
-*   **JSONB for Flexibility**: Fields like `tenants.plan_details`, `campaigns.settings`, and `leads.custom_fields` use `JSONB` for storing schemaless or evolving structured data.
-*   **Scalability & Performance**:
-    *   Strategic indexing is crucial (see specific indexes per table). Focus is on `tenant_id`, foreign keys, status fields used in WHERE clauses, and timestamps for range queries.
-    *   The application layer should encourage batch operations for data ingestion (e.g., leads) and updates.
-*   **n8n / Automation Integration**:
-    *   The schema supports status-driven workflows (e.g., n8n polling for `outbound_emails.status = 'scheduled'`).
-    *   `campaigns.settings` can store configurations that n8n workflows read.
-    *   `tenants.api_key_hash` allows for secure, tenant-specific API access if an API layer is built.
+* **Scalability & Performance**:
+    * Strategic indexing on frequently queried fields
+    * JSONB for flexible data storage (website data, enrichment)
+    * UUID primary keys for distributed-friendly identifiers
+    * Timestamps with timezone for consistent time tracking
+
+* **Integration Support**:
+    * Schema designed to support n8n automation workflows
+    * Status fields for workflow state management
+    * External IDs for system integration
+    * Flexible data storage for enrichment data
+
+* **Data Quality**:
+    * Email validation tracking
+    * Source tracking for data provenance
+    * Status tracking for campaign progress
+    * Timestamps for activity tracking
 
 ## 4. Security Considerations
 
-*   **Data Isolation**: Strict `tenant_id` filtering in all application queries is paramount.
-*   **Sensitive Data**: Passwords (`users.password_hash`) and API keys (`tenants.api_key_hash`) must be stored hashed (e.g., using bcrypt or Argon2).
-*   **SQL Injection**: Use of an ORM like SQLAlchemy with parameterized queries helps prevent SQL injection vulnerabilities.
-*   **Least Privilege**: Database users connecting from the application should have the minimum necessary privileges. 
+* **Data Access**:
+    * SQLAlchemy ORM for safe query construction
+    * Parameterized queries to prevent SQL injection
+    * Type-safe database access through ORM models
+
+* **Data Integrity**:
+    * Foreign key constraints for referential integrity
+    * NOT NULL constraints on required fields
+    * Indexes for performance and data integrity
+
+* **Configuration**:
+    * Environment-based configuration
+    * Secure database URL handling
+    * Connection pooling through SQLAlchemy
+
+## 5. Future Considerations
+
+* **Multi-tenancy Implementation**:
+    * Add tenant_id to all tables
+    * Implement tenant isolation
+    * Add tenant-specific API keys
+
+* **User Management**:
+    * Add users table
+    * Implement role-based access control
+    * Add authentication system
+
+* **Email Management**:
+    * Add outbound_emails table
+    * Add email_replies table
+    * Implement email tracking
+
+* **Analytics**:
+    * Add campaign performance metrics
+    * Implement reporting views
+    * Add data aggregation tables 
