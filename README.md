@@ -1,2 +1,3 @@
-# CustomerCenter
-An email outreach system to acquire new customers
+# Outreach DB Project
+
+This project manages outreach-related tables in a shared PostgreSQL DB using SQLAlchemy and Alembic.
