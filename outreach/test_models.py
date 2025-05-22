@@ -100,6 +100,7 @@ class TestLead(TestBase):
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     headline: Mapped[str | None] = mapped_column(String, nullable=True)
     linkedin_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    linkedin_data: Mapped[str | None] = mapped_column(String, nullable=True)
     email_verification_status: Mapped[str | None] = mapped_column(String, nullable=True)
     email_verification_message: Mapped[str | None] = mapped_column(
         String, nullable=True

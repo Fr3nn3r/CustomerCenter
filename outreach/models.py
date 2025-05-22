@@ -59,6 +59,8 @@ class Organization(Base):
         String, nullable=True
     )
     raw_address: Mapped[str | None] = mapped_column(String, nullable=True)
+    external_datasetid: Mapped[str | None] = mapped_column(String, nullable=True)
+    import_run: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -93,12 +95,15 @@ class Lead(Base):
     title: Mapped[str | None] = mapped_column(String, nullable=True)
     headline: Mapped[str | None] = mapped_column(String, nullable=True)
     linkedin_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    linkedin_data: Mapped[str | None] = mapped_column(String, nullable=True)
     email_verification_status: Mapped[str | None] = mapped_column(String, nullable=True)
     email_verification_message: Mapped[str | None] = mapped_column(
         String, nullable=True
     )
     email_icebreaker: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False)
+    external_datasetid: Mapped[str | None] = mapped_column(String, nullable=True)
+    import_run: Mapped[str | None] = mapped_column(String, nullable=True)
     language: Mapped[str | None] = mapped_column(String, nullable=True)
     source: Mapped[str | None] = mapped_column(String, nullable=True)
     email_sent_at: Mapped[datetime | None] = mapped_column(
